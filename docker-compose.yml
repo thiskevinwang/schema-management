@@ -1,0 +1,68 @@
+x-default-logging: &logging
+  # driver: "local"
+  driver: "json-file"
+  options:
+    max-size: "5m"
+    max-file: "2"
+    tag: "{{.Name}}"
+
+x-go-env: &go-env
+  PORT: 3001
+  
+x-typescript-env: &ts-env
+  NODE_ENV: "development"
+  ORIGIN_BASE_URL: "http://go:3001"
+
+services:
+  load:
+    image: locustio/locust
+    ports:
+     - "8089:8089"
+    volumes:
+      - ./locust:/mnt/locust
+    environment:
+      - LOCUST_LOCUSTFILE=/mnt/locust/locustfile.py
+      - LOCUST_HOST=http://typescript:3000
+      - LOCUST_USERS=5
+      - LOCUST_SPAWN_RATE=10
+      - LOCUST_RUN_TIME=3s
+      # - LOCUST_HEADLESS=true
+  typescript:
+    build:
+      context: ./apps/typescript
+      dockerfile: Dockerfile
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./apps/typescript
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: package.json
+    command:
+      - "npx"
+      - "tsx"
+      - "index.ts"
+    environment: *ts-env
+    # environment:
+    #   <<: *env
+    logging:
+      <<: *logging
+    ports:
+      - "3000:3000"
+    tty: true
+  go:
+    build:
+      context: ./apps/go
+      dockerfile: Dockerfile
+    develop:
+      watch:
+        - action: rebuild
+          path: ./apps/go
+    command: "/app"
+    environment: *go-env
+    logging:
+      <<: *logging
+    ports:
+      - "3001:3001"
